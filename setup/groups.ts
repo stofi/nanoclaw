@@ -113,60 +113,76 @@ const upsert = db.prepare(
   'INSERT INTO chats (jid, name, last_message_time) VALUES (?, ?, ?) ON CONFLICT(jid) DO UPDATE SET name = excluded.name'
 );
 
-const { state, saveCreds } = await useMultiFileAuthState(authDir);
-
-const sock = makeWASocket({
-  auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
-  printQRInTerminal: false,
-  logger,
-  browser: Browsers.macOS('Chrome'),
-});
-
 const timeout = setTimeout(() => {
   console.error('TIMEOUT');
+  db.close();
   process.exit(1);
 }, 30000);
 
-sock.ev.on('creds.update', saveCreds);
+async function connect() {
+  const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
-sock.ev.on('connection.update', async (update) => {
-  if (update.connection === 'open') {
-    try {
-      const groups = await sock.groupFetchAllParticipating();
-      const now = new Date().toISOString();
-      let count = 0;
-      for (const [jid, metadata] of Object.entries(groups)) {
-        if (metadata.subject) {
-          upsert.run(jid, metadata.subject, now);
-          count++;
+  const sock = makeWASocket({
+    auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
+    printQRInTerminal: false,
+    logger,
+    browser: Browsers.macOS('Chrome'),
+  });
+
+  sock.ev.on('creds.update', saveCreds);
+
+  sock.ev.on('connection.update', async (update) => {
+    if (update.connection === 'open') {
+      try {
+        const groups = await sock.groupFetchAllParticipating();
+        const now = new Date().toISOString();
+        let count = 0;
+        for (const [jid, metadata] of Object.entries(groups)) {
+          if (metadata.subject) {
+            upsert.run(jid, metadata.subject, now);
+            count++;
+          }
         }
+        console.log('SYNCED:' + count);
+      } catch (err) {
+        console.error('FETCH_ERROR:' + err.message);
+      } finally {
+        clearTimeout(timeout);
+        sock.end(undefined);
+        db.close();
+        process.exit(0);
       }
-      console.log('SYNCED:' + count);
-    } catch (err) {
-      console.error('FETCH_ERROR:' + err.message);
-    } finally {
-      clearTimeout(timeout);
-      sock.end(undefined);
-      db.close();
-      process.exit(0);
+    } else if (update.connection === 'close') {
+      const statusCode = update.lastDisconnect?.error?.output?.statusCode;
+      if (statusCode === 515) {
+        // Stream error — reconnect
+        connect();
+      } else {
+        clearTimeout(timeout);
+        console.error('CONNECTION_CLOSED:' + statusCode);
+        db.close();
+        process.exit(1);
+      }
     }
-  } else if (update.connection === 'close') {
-    clearTimeout(timeout);
-    console.error('CONNECTION_CLOSED');
-    process.exit(1);
-  }
-});
+  });
+}
+
+connect();
 `;
 
-    const output = execSync(
-      `node --input-type=module -e ${JSON.stringify(syncScript)}`,
-      {
+    const tmpScript = path.join(projectRoot, '.tmp-sync-groups.mjs');
+    fs.writeFileSync(tmpScript, syncScript);
+    let output: string;
+    try {
+      output = execSync(`node ${tmpScript}`, {
         cwd: projectRoot,
         encoding: 'utf-8',
         timeout: 45000,
         stdio: ['ignore', 'pipe', 'pipe'],
-      },
-    );
+      });
+    } finally {
+      fs.unlinkSync(tmpScript);
+    }
     syncOk = output.includes('SYNCED:');
     logger.info({ output: output.trim() }, 'Sync output');
   } catch (err) {

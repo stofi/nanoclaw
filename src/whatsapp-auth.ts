@@ -45,6 +45,20 @@ function askQuestion(prompt: string): Promise<string> {
   });
 }
 
+let activeSock: ReturnType<typeof makeWASocket> | null = null;
+
+let gracefulExit = false;
+
+// Gracefully close the socket on Ctrl+C so WhatsApp doesn't invalidate the device
+process.on('SIGINT', () => {
+  console.log('\n  Closing connection gracefully...');
+  gracefulExit = true;
+  if (activeSock) {
+    activeSock.end(undefined);
+  }
+  setTimeout(() => process.exit(0), 500);
+});
+
 async function connectSocket(
   phoneNumber?: string,
   isReconnect = false,
@@ -77,6 +91,7 @@ async function connectSocket(
     logger,
     browser: Browsers.macOS('Chrome'),
   });
+  activeSock = sock;
 
   if (usePairingCode && phoneNumber && !state.creds.me) {
     // Request pairing code after a short delay for connection to initialize
@@ -126,6 +141,9 @@ async function connectSocket(
         // registration completes. Reconnect to finish the handshake.
         console.log('\n⟳ Stream error (515) after pairing — reconnecting...');
         connectSocket(phoneNumber, true);
+      } else if (gracefulExit) {
+        // User pressed Ctrl+C — don't print error
+        process.exit(0);
       } else {
         fs.writeFileSync(STATUS_FILE, `failed:${reason || 'unknown'}`);
         console.log('\n✗ Connection failed. Please try again.');
@@ -134,6 +152,11 @@ async function connectSocket(
     }
 
     if (connection === 'open') {
+      // Ensure registered flag is set — the 515 reconnect can leave it false
+      if (!state.creds.registered) {
+        state.creds.registered = true;
+        saveCreds();
+      }
       fs.writeFileSync(STATUS_FILE, 'authenticated');
       // Clean up QR file now that we're connected
       try {
@@ -141,10 +164,17 @@ async function connectSocket(
       } catch {}
       console.log('\n✓ Successfully authenticated with WhatsApp!');
       console.log('  Credentials saved to store/auth/');
-      console.log('  You can now start the NanoClaw service.\n');
+      console.log('  Waiting for message history sync...');
+      console.log('  (Keep WhatsApp open on your phone)\n');
 
-      // Give it a moment to save credentials, then exit
-      setTimeout(() => process.exit(0), 1000);
+      let syncDone = false;
+      sock.ev.on('messaging-history.set', () => {
+        if (!syncDone) {
+          syncDone = true;
+          console.log('  ✓ Message history sync complete!');
+          console.log('  Press Ctrl+C to exit.\n');
+        }
+      });
     }
   });
 
