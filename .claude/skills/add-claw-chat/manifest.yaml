@@ -1,0 +1,20 @@
+skill: add-claw-chat
+version: 1.0.0
+description: "claw-chat WebUI channel — HTTP-based chat interface replacing third-party messaging services"
+core_version: 0.1.0
+adds:
+  - src/channels/web.ts
+  - src/channels/web.test.ts
+modifies:
+  - src/index.ts
+  - src/config.ts
+structured:
+  npm_dependencies: {}
+  env_additions:
+    - WEBUI_URL
+    - WEBUI_INTERNAL_SECRET
+    - WEBUI_POLL_INTERVAL_MS
+    - WEBUI_ONLY
+conflicts: []
+depends: []
+test: "npx vitest run src/channels/web.test.ts"
