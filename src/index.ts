@@ -124,12 +124,14 @@ function registerGroup(jid: string, group: RegisteredGroup): void {
 /**
  * Get available groups list for the agent.
  * Returns groups ordered by most recent activity.
+ * Merges WhatsApp chats (from DB) with registered groups (e.g. web sessions)
+ * so the main agent can look up any registered JID regardless of channel.
  */
 export function getAvailableGroups(): import('./container-runner.js').AvailableGroup[] {
   const chats = getAllChats();
   const registeredJids = new Set(Object.keys(registeredGroups));
 
-  return chats
+  const fromChats = chats
     .filter((c) => c.jid !== '__group_sync__' && c.is_group)
     .map((c) => ({
       jid: c.jid,
@@ -137,6 +139,20 @@ export function getAvailableGroups(): import('./container-runner.js').AvailableG
       lastActivity: c.last_message_time,
       isRegistered: registeredJids.has(c.jid),
     }));
+
+  const chatJids = new Set(fromChats.map((g) => g.jid));
+
+  // Include registered groups not already in the chats list (e.g. web sessions)
+  const fromRegistered = Object.entries(registeredGroups)
+    .filter(([jid]) => !chatJids.has(jid))
+    .map(([jid, group]) => ({
+      jid,
+      name: group.name,
+      lastActivity: group.added_at,
+      isRegistered: true,
+    }));
+
+  return [...fromChats, ...fromRegistered];
 }
 
 /** @internal - exported for testing */

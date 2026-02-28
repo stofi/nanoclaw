@@ -96,9 +96,9 @@ Available groups are provided in `/workspace/ipc/available_groups.json`:
 }
 ```
 
-Groups are ordered by most recent activity. The list is synced from WhatsApp daily.
+Groups include both WhatsApp groups (synced daily) and registered web/other channel sessions. Registered groups always appear with `isRegistered: true`.
 
-If a group the user mentions isn't in the list, request a fresh sync:
+If a WhatsApp group the user mentions isn't in the list, request a fresh sync:
 
 ```bash
 echo '{"type": "refresh_groups"}' > /workspace/ipc/tasks/refresh_$(date +%s).json
