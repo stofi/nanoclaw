@@ -78,6 +78,7 @@ export class WebChannel implements Channel {
   async pushWorkspaceSnapshot(jid: string, tree: FileEntry[]): Promise<void> {
     if (!jid.startsWith('web:')) return;
     const conversationId = jid.slice(4);
+    logger.info({ jid, fileCount: tree.length }, 'WebChannel: pushing workspace snapshot');
     await this.post('/api/internal/workspace-snapshot', { conversationId, tree }).catch(err =>
       logger.warn({ jid, err }, 'WebChannel: failed to push workspace snapshot'),
     );
