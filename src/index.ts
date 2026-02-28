@@ -3,12 +3,15 @@ import path from 'path';
 
 import {
   ASSISTANT_NAME,
+  CLAW_CHAT_SECRET,
+  CLAW_CHAT_URL,
   IDLE_TIMEOUT,
   MAIN_GROUP_FOLDER,
   POLL_INTERVAL,
   TRIGGER_PATTERN,
 } from './config.js';
 import { WhatsAppChannel } from './channels/whatsapp.js';
+import { WebChannel } from './channels/web.js';
 import {
   ContainerOutput,
   runContainerAgent,
@@ -478,6 +481,19 @@ async function main(): Promise<void> {
   whatsapp = new WhatsAppChannel(channelOpts);
   channels.push(whatsapp);
   await whatsapp.connect();
+
+  if (CLAW_CHAT_URL && CLAW_CHAT_SECRET) {
+    const web = new WebChannel({
+      url: CLAW_CHAT_URL,
+      secret: CLAW_CHAT_SECRET,
+      onMessage: channelOpts.onMessage,
+      onChatMetadata: channelOpts.onChatMetadata,
+      registerGroup,
+      registeredGroups: () => registeredGroups,
+    });
+    channels.push(web);
+    await web.connect();
+  }
 
   // Start subsystems (independently of connection handler)
   startSchedulerLoop({
