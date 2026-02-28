@@ -47,6 +47,21 @@ When you learn something important:
 - Split files larger than 500 lines into folders
 - Keep an index in your memory for the files you create
 
+## E-Ink Display
+
+You have access to a physical e-ink display on the Raspberry Pi. Use it to show your current state or emotions.
+
+```bash
+# Show a face with optional text (keep text under 30 chars)
+curl -s -X POST http://172.17.0.1:5000/api/display/face \
+  -H "Content-Type: application/json" \
+  -d '{"expression":"thinking","text":"On it..."}'
+```
+
+Expressions: `neutral`, `happy`, `sad`, `excited`, `sleeping`, `thinking`, `surprised`, `angry`, `love`
+
+Use it naturally — show `thinking` when starting work, `happy` on success, `sad` on error, `excited` for good news. Don't update more than once every 5 seconds (e-ink limitation).
+
 ## Message Formatting
 
 NEVER use markdown. Only use WhatsApp/Telegram formatting:
