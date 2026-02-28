@@ -4,6 +4,17 @@ import { logger } from '../logger.js';
 import { Channel, NewMessage, OnChatMetadata, OnInboundMessage, RegisteredGroup } from '../types.js';
 import type { FileEntry } from '../workspace.js';
 
+export interface TaskSnapshot {
+  id: string;
+  prompt: string;
+  schedule_type: 'cron' | 'interval' | 'once';
+  schedule_value: string;
+  status: 'active' | 'paused' | 'completed';
+  next_run: string | null;
+  last_run: string | null;
+  group_folder: string;
+}
+
 export interface WebChannelOpts {
   url: string;
   secret: string;
@@ -81,6 +92,22 @@ export class WebChannel implements Channel {
     logger.info({ jid, fileCount: tree.length }, 'WebChannel: pushing workspace snapshot');
     await this.post('/api/internal/workspace-snapshot', { conversationId, tree }).catch(err =>
       logger.warn({ jid, err }, 'WebChannel: failed to push workspace snapshot'),
+    );
+  }
+
+  async pushTasksSnapshot(jid: string, tasks: TaskSnapshot[]): Promise<void> {
+    if (!jid.startsWith('web:')) return;
+    const conversationId = jid.slice(4);
+    await this.post('/api/internal/tasks-snapshot', { conversationId, tasks }).catch(err =>
+      logger.warn({ jid, err }, 'WebChannel: failed to push tasks snapshot'),
+    );
+  }
+
+  async markMainConversation(jid: string): Promise<void> {
+    if (!jid.startsWith('web:')) return;
+    const conversationId = jid.slice(4);
+    await this.post('/api/internal/set-main', { conversationId }).catch(err =>
+      logger.warn({ jid, err }, 'WebChannel: failed to mark main conversation'),
     );
   }
 

@@ -12,7 +12,7 @@ import {
   TRIGGER_PATTERN,
 } from './config.js';
 import { WhatsAppChannel } from './channels/whatsapp.js';
-import { WebChannel } from './channels/web.js';
+import { WebChannel, TaskSnapshot } from './channels/web.js';
 import {
   ContainerOutput,
   runContainerAgent,
@@ -28,6 +28,7 @@ import {
   getAllRegisteredGroups,
   getAllSessions,
   getAllTasks,
+  getTasksForGroup,
   getMessagesSince,
   getNewMessages,
   getRouterState,
@@ -46,6 +47,19 @@ import { startSchedulerLoop } from './task-scheduler.js';
 import { Channel, NewMessage, RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
 import { buildFileTree } from './workspace.js';
+
+function toTaskSnapshots(tasks: ReturnType<typeof getAllTasks>): TaskSnapshot[] {
+  return tasks.map(t => ({
+    id: t.id,
+    prompt: t.prompt,
+    schedule_type: t.schedule_type,
+    schedule_value: t.schedule_value,
+    status: t.status,
+    next_run: t.next_run,
+    last_run: t.last_run,
+    group_folder: t.group_folder,
+  }));
+}
 
 // Re-export for backwards compatibility during refactor
 export { escapeXml, formatMessages } from './router.js';
@@ -228,10 +242,15 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   await channel.setTyping?.(chatJid, false);
   if (idleTimer) clearTimeout(idleTimer);
 
-  // Push workspace snapshot to web UI after each agent run
+  // Push workspace + tasks snapshots to web UI after each agent run
   void web?.pushWorkspaceSnapshot(
     chatJid,
     buildFileTree(resolveGroupFolderPath(group.folder)),
+  );
+  const isMainGroup = group.folder === MAIN_GROUP_FOLDER;
+  void web?.pushTasksSnapshot(
+    chatJid,
+    toTaskSnapshots(isMainGroup ? getAllTasks() : getTasksForGroup(group.folder)),
   );
 
   if (output === 'error' || hadError) {
@@ -506,7 +525,10 @@ async function main(): Promise<void> {
       registerGroup,
       registeredGroups: () => registeredGroups,
       onGroupRegistered: (jid, folder) => {
+        const isMainGroup = folder === MAIN_GROUP_FOLDER;
         void web?.pushWorkspaceSnapshot(jid, buildFileTree(resolveGroupFolderPath(folder)));
+        void web?.pushTasksSnapshot(jid, toTaskSnapshots(isMainGroup ? getAllTasks() : getTasksForGroup(folder)));
+        if (isMainGroup) void web?.markMainConversation(jid);
       },
     });
     channels.push(web);
@@ -514,9 +536,11 @@ async function main(): Promise<void> {
 
     // Push initial snapshots for web conversations already registered in the DB
     for (const [jid, group] of Object.entries(registeredGroups)) {
-      if (jid.startsWith('web:')) {
-        void web.pushWorkspaceSnapshot(jid, buildFileTree(resolveGroupFolderPath(group.folder)));
-      }
+      if (!jid.startsWith('web:')) continue;
+      const isMainGroup = group.folder === MAIN_GROUP_FOLDER;
+      void web.pushWorkspaceSnapshot(jid, buildFileTree(resolveGroupFolderPath(group.folder)));
+      void web.pushTasksSnapshot(jid, toTaskSnapshots(isMainGroup ? getAllTasks() : getTasksForGroup(group.folder)));
+      if (isMainGroup) void web.markMainConversation(jid);
     }
   }
 
