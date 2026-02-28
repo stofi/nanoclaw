@@ -64,10 +64,6 @@ Use it naturally — show `thinking` when starting work, `happy` on success, `sa
 
 ## Message Formatting
 
-NEVER use markdown. Only use WhatsApp/Telegram formatting:
-- *single asterisks* for bold (NEVER **double asterisks**)
-- _underscores_ for italic
-- • bullet points
-- ```triple backticks``` for code
+Use standard markdown in your responses. The chat UI renders it properly.
 
-No ## headings. No [links](url). No **double stars**.
+If your group's CLAUDE.md specifies platform-specific formatting (e.g. WhatsApp), follow that instead.
