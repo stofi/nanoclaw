@@ -268,6 +268,7 @@ export async function processTaskIpc(
           { taskId, sourceGroup, targetFolder, contextMode },
           'Task created via IPC',
         );
+        deps.pushTasksSnapshotsAfterChange(targetFolder);
       }
       break;
 
