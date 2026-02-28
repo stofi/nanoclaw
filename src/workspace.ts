@@ -16,6 +16,9 @@ const EXCLUDED = new Set([
   'conversations', // can be large; exclude from tree
 ]);
 
+// Pattern for Linux core dump files (core.<pid>)
+const CORE_DUMP_RE = /^core\.\d+$/;
+
 const MAX_DEPTH = 4;
 
 /**
@@ -35,7 +38,7 @@ export function buildFileTree(dir: string, depth = 0): FileEntry[] {
 
   const result: FileEntry[] = [];
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (entry.name.startsWith('.') || EXCLUDED.has(entry.name)) continue;
+    if (entry.name.startsWith('.') || EXCLUDED.has(entry.name) || CORE_DUMP_RE.test(entry.name)) continue;
     if (entry.isDirectory()) {
       result.push({
         name: entry.name,
