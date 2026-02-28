@@ -502,6 +502,9 @@ async function main(): Promise<void> {
       onChatMetadata: channelOpts.onChatMetadata,
       registerGroup,
       registeredGroups: () => registeredGroups,
+      onGroupRegistered: (jid, folder) => {
+        void web?.pushWorkspaceSnapshot(jid, buildFileTree(resolveGroupFolderPath(folder)));
+      },
     });
     channels.push(web);
     await web.connect();

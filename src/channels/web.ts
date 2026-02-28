@@ -11,6 +11,8 @@ export interface WebChannelOpts {
   onChatMetadata: OnChatMetadata;
   registerGroup: (jid: string, group: RegisteredGroup) => void;
   registeredGroups: () => Record<string, RegisteredGroup>;
+  /** Called after a new conversation is registered so the host can push an initial snapshot. */
+  onGroupRegistered?: (jid: string, folder: string) => void;
 }
 
 export class WebChannel implements Channel {
@@ -108,6 +110,7 @@ export class WebChannel implements Channel {
             added_at: new Date().toISOString(),
           });
           logger.info({ jid, name: reg.name }, 'WebChannel: registered conversation');
+          this.opts.onGroupRegistered?.(jid, reg.folder);
         }
         newConversationIds.push(reg.conversationId);
       }
