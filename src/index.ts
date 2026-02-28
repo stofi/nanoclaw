@@ -49,16 +49,18 @@ import { logger } from './logger.js';
 import { buildFileTree } from './workspace.js';
 
 function toTaskSnapshots(tasks: ReturnType<typeof getAllTasks>): TaskSnapshot[] {
-  return tasks.map(t => ({
-    id: t.id,
-    prompt: t.prompt,
-    schedule_type: t.schedule_type,
-    schedule_value: t.schedule_value,
-    status: t.status,
-    next_run: t.next_run,
-    last_run: t.last_run,
-    group_folder: t.group_folder,
-  }));
+  return tasks
+    .filter(t => t.status !== 'completed')
+    .map(t => ({
+      id: t.id,
+      prompt: t.prompt,
+      schedule_type: t.schedule_type,
+      schedule_value: t.schedule_value,
+      status: t.status,
+      next_run: t.next_run,
+      last_run: t.last_run,
+      group_folder: t.group_folder,
+    }));
 }
 
 // Re-export for backwards compatibility during refactor

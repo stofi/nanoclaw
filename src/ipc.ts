@@ -186,13 +186,28 @@ export async function processTaskIpc(
         data.schedule_value &&
         data.targetJid
       ) {
-        // Resolve the target group from JID
-        const targetJid = data.targetJid as string;
-        const targetGroupEntry = registeredGroups[targetJid];
+        // Resolve the target group from JID or folder name
+        const requestedTarget = data.targetJid as string;
+        let targetJid = requestedTarget;
+        let targetGroupEntry = registeredGroups[requestedTarget];
+
+        // Fallback: agent may pass folder name (e.g. "web-43d138a6") instead of full JID
+        if (!targetGroupEntry) {
+          const found = Object.entries(registeredGroups).find(
+            ([, g]) => g.folder === requestedTarget,
+          );
+          if (found) {
+            [targetJid, targetGroupEntry] = found;
+            logger.debug(
+              { requestedTarget, resolvedJid: targetJid },
+              'Resolved target group by folder name',
+            );
+          }
+        }
 
         if (!targetGroupEntry) {
           logger.warn(
-            { targetJid },
+            { targetJid: requestedTarget },
             'Cannot schedule task: target group not registered',
           );
           break;
