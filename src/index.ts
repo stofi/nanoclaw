@@ -28,7 +28,10 @@ import {
   getAllRegisteredGroups,
   getAllSessions,
   getAllTasks,
+  getTaskById,
   getTasksForGroup,
+  updateTask,
+  deleteTask,
   getMessagesSince,
   getNewMessages,
   getRouterState,
@@ -546,6 +549,31 @@ async function main(): Promise<void> {
         void web?.pushWorkspaceSnapshot(jid, buildFileTree(resolveGroupFolderPath(folder)));
         void web?.pushTasksSnapshot(jid, toTaskSnapshots(isMainGroup ? getAllTasks() : getTasksForGroup(folder)));
         if (isMainGroup) void web?.markMainConversation(jid);
+      },
+      onTaskAction: (conversationId, taskId, action) => {
+        const task = getTaskById(taskId);
+        if (!task) {
+          logger.warn({ taskId, action }, 'WebChannel: task action for unknown task');
+          return;
+        }
+        if (action === 'cancel') {
+          deleteTask(taskId);
+          logger.info({ taskId, conversationId }, 'WebChannel: task cancelled');
+        } else {
+          updateTask(taskId, { status: action === 'pause' ? 'paused' : 'active' });
+          logger.info({ taskId, action, conversationId }, 'WebChannel: task status updated');
+        }
+        // Push updated snapshots to all web conversations that can see this task
+        for (const [jid, group] of Object.entries(registeredGroups)) {
+          if (!jid.startsWith('web:')) continue;
+          const gIsMain = group.folder === MAIN_GROUP_FOLDER;
+          if (group.folder === task.group_folder || gIsMain) {
+            void web?.pushTasksSnapshot(
+              jid,
+              toTaskSnapshots(gIsMain ? getAllTasks() : getTasksForGroup(group.folder)),
+            );
+          }
+        }
       },
     });
     channels.push(web);

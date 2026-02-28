@@ -58,7 +58,7 @@ You have access to a physical e-ink display on the Raspberry Pi. Use it to show 
 
 ```bash
 # Show a face with optional text (keep text under 30 chars)
-curl -s -X POST http://172.17.0.1:5000/api/display/face \
+curl -s -X POST http://172.17.0.1:3100/api/display/face \
   -H "Content-Type: application/json" \
   -d '{"expression":"thinking","text":"On it..."}'
 ```

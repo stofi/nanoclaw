@@ -24,6 +24,8 @@ export interface WebChannelOpts {
   registeredGroups: () => Record<string, RegisteredGroup>;
   /** Called after a new conversation is registered so the host can push an initial snapshot. */
   onGroupRegistered?: (jid: string, folder: string) => void;
+  /** Called when the browser queues a task action (pause/resume/cancel). */
+  onTaskAction?: (conversationId: string, taskId: string, action: 'pause' | 'resume' | 'cancel') => void;
 }
 
 export class WebChannel implements Channel {
@@ -121,10 +123,12 @@ export class WebChannel implements Channel {
       const data = await this.get<{
         registrations: Array<{ conversationId: string; name: string; folder: string }>;
         messages: Array<{ id: string; conversationId: string; senderName: string; content: string; createdAt: string }>;
+        taskActions?: Array<{ id: string; conversationId: string; taskId: string; action: 'pause' | 'resume' | 'cancel' }>;
       }>('/api/internal/pending');
 
       const newConversationIds: string[] = [];
       const newMessageIds: string[] = [];
+      const ackedTaskActionIds: string[] = [];
 
       for (const reg of data.registrations ?? []) {
         const jid = `web:${reg.conversationId}`;
@@ -158,10 +162,25 @@ export class WebChannel implements Channel {
         newMessageIds.push(msg.id);
       }
 
-      if (newConversationIds.length > 0 || newMessageIds.length > 0) {
+      for (const action of data.taskActions ?? []) {
+        if (this.opts.onTaskAction) {
+          try {
+            this.opts.onTaskAction(action.conversationId, action.taskId, action.action);
+            ackedTaskActionIds.push(action.id);
+          } catch (err) {
+            logger.warn({ action, err }, 'WebChannel: task action handler error');
+          }
+        } else {
+          // No handler registered, ack anyway so they don't pile up
+          ackedTaskActionIds.push(action.id);
+        }
+      }
+
+      if (newConversationIds.length > 0 || newMessageIds.length > 0 || ackedTaskActionIds.length > 0) {
         await this.post('/api/internal/ack', {
           conversationIds: newConversationIds,
           messageIds: newMessageIds,
+          taskActionIds: ackedTaskActionIds,
         });
       }
     } catch (err) {
