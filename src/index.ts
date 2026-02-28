@@ -5,6 +5,7 @@ import {
   ASSISTANT_NAME,
   CLAW_CHAT_SECRET,
   CLAW_CHAT_URL,
+  DISABLE_WHATSAPP,
   IDLE_TIMEOUT,
   MAIN_GROUP_FOLDER,
   POLL_INTERVAL,
@@ -490,9 +491,11 @@ async function main(): Promise<void> {
   };
 
   // Create and connect channels
-  whatsapp = new WhatsAppChannel(channelOpts);
-  channels.push(whatsapp);
-  await whatsapp.connect();
+  if (!DISABLE_WHATSAPP) {
+    whatsapp = new WhatsAppChannel(channelOpts);
+    channels.push(whatsapp);
+    await whatsapp.connect();
+  }
 
   if (CLAW_CHAT_URL && CLAW_CHAT_SECRET) {
     web = new WebChannel({
@@ -508,6 +511,13 @@ async function main(): Promise<void> {
     });
     channels.push(web);
     await web.connect();
+
+    // Push initial snapshots for web conversations already registered in the DB
+    for (const [jid, group] of Object.entries(registeredGroups)) {
+      if (jid.startsWith('web:')) {
+        void web.pushWorkspaceSnapshot(jid, buildFileTree(resolveGroupFolderPath(group.folder)));
+      }
+    }
   }
 
   // Start subsystems (independently of connection handler)

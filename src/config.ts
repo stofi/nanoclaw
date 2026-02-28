@@ -6,7 +6,7 @@ import { readEnvFile } from './env.js';
 // Read config values from .env (falls back to process.env).
 // Secrets are NOT read here — they stay on disk and are loaded only
 // where needed (container-runner.ts) to avoid leaking to child processes.
-const envConfig = readEnvFile(['ASSISTANT_NAME', 'ASSISTANT_HAS_OWN_NUMBER', 'CLAW_CHAT_URL', 'CLAW_CHAT_SECRET']);
+const envConfig = readEnvFile(['ASSISTANT_NAME', 'ASSISTANT_HAS_OWN_NUMBER', 'CLAW_CHAT_URL', 'CLAW_CHAT_SECRET', 'DISABLE_WHATSAPP']);
 
 export const ASSISTANT_NAME =
   process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'Andy';
@@ -68,3 +68,5 @@ export const CLAW_CHAT_URL =
   process.env.CLAW_CHAT_URL || envConfig.CLAW_CHAT_URL || '';
 export const CLAW_CHAT_SECRET =
   process.env.CLAW_CHAT_SECRET || envConfig.CLAW_CHAT_SECRET || '';
+export const DISABLE_WHATSAPP =
+  (process.env.DISABLE_WHATSAPP || envConfig.DISABLE_WHATSAPP) === 'true';
