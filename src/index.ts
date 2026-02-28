@@ -573,6 +573,19 @@ async function main(): Promise<void> {
     getAvailableGroups,
     writeGroupsSnapshot: (gf, im, ag, rj) =>
       writeGroupsSnapshot(gf, im, ag, rj),
+    pushTasksSnapshotsAfterChange: (affectedGroupFolder) => {
+      for (const [jid, group] of Object.entries(registeredGroups)) {
+        if (!jid.startsWith('web:')) continue;
+        const gIsMain = group.folder === MAIN_GROUP_FOLDER;
+        // Push to the affected group and to main (main sees all tasks)
+        if (group.folder === affectedGroupFolder || gIsMain) {
+          void web?.pushTasksSnapshot(
+            jid,
+            toTaskSnapshots(gIsMain ? getAllTasks() : getTasksForGroup(group.folder)),
+          );
+        }
+      }
+    },
   });
   queue.setProcessMessagesFn(processGroupMessages);
   recoverPendingMessages();
