@@ -247,7 +247,6 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     chatJid,
     buildFileTree(resolveGroupFolderPath(group.folder)),
   );
-  const isMainGroup = group.folder === MAIN_GROUP_FOLDER;
   void web?.pushTasksSnapshot(
     chatJid,
     toTaskSnapshots(isMainGroup ? getAllTasks() : getTasksForGroup(group.folder)),
