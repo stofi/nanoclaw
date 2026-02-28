@@ -44,6 +44,7 @@ import { findChannel, formatMessages, formatOutbound } from './router.js';
 import { startSchedulerLoop } from './task-scheduler.js';
 import { Channel, NewMessage, RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
+import { buildFileTree } from './workspace.js';
 
 // Re-export for backwards compatibility during refactor
 export { escapeXml, formatMessages } from './router.js';
@@ -55,6 +56,7 @@ let lastAgentTimestamp: Record<string, string> = {};
 let messageLoopRunning = false;
 
 let whatsapp: WhatsAppChannel;
+let web: WebChannel | undefined;
 const channels: Channel[] = [];
 const queue = new GroupQueue();
 
@@ -191,6 +193,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   };
 
   await channel.setTyping?.(chatJid, true);
+  void web?.pushContainerStatus(chatJid, 'running');
   let hadError = false;
   let outputSentToUser = false;
 
@@ -224,6 +227,12 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   await channel.setTyping?.(chatJid, false);
   if (idleTimer) clearTimeout(idleTimer);
 
+  // Push workspace snapshot to web UI after each agent run
+  void web?.pushWorkspaceSnapshot(
+    chatJid,
+    buildFileTree(resolveGroupFolderPath(group.folder)),
+  );
+
   if (output === 'error' || hadError) {
     // If we already sent output to the user, don't roll back the cursor —
     // the user got their response and re-processing would send duplicates.
@@ -232,6 +241,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
         { group: group.name },
         'Agent error after output was sent, skipping cursor rollback to prevent duplicates',
       );
+      void web?.pushContainerStatus(chatJid, 'idle');
       return true;
     }
     // Roll back cursor so retries can re-process these messages
@@ -241,9 +251,11 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       { group: group.name },
       'Agent error, rolled back message cursor for retry',
     );
+    void web?.pushContainerStatus(chatJid, 'error');
     return false;
   }
 
+  void web?.pushContainerStatus(chatJid, 'idle');
   return true;
 }
 
@@ -483,7 +495,7 @@ async function main(): Promise<void> {
   await whatsapp.connect();
 
   if (CLAW_CHAT_URL && CLAW_CHAT_SECRET) {
-    const web = new WebChannel({
+    web = new WebChannel({
       url: CLAW_CHAT_URL,
       secret: CLAW_CHAT_SECRET,
       onMessage: channelOpts.onMessage,
